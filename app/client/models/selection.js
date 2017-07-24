@@ -1,4 +1,3 @@
-const cloneDeep = require('lodash/cloneDeep')
 const findLastIndex = require('lodash/findLastIndex')
 const difference = require('lodash/difference')
 const uniq = require('lodash/uniq')
@@ -109,7 +108,6 @@ module.exports = (state, bus) => {
   const getlist = () => state.selection.list
 
   const setlookup = lookup => { state.selection.lookup = lookup }
-  const getlookup = () => state.selection.lookup
 
   const clear = () => {
     setref(null)
