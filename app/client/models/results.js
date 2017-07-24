@@ -1,6 +1,4 @@
 const uniqBy = require('lodash/uniqBy')
-const sortBy = require('lodash/sortBy')
-const isArray = require('lodash/isArray')
 const paper = require('../lib/getpaper')
 
 module.exports = (state, bus) => {
@@ -16,7 +14,6 @@ module.exports = (state, bus) => {
 
   const get = () => state.results
   const set = results => { state.results = results }
-  const setone = (idx, result) => { state.results[idx] =  result }
 
   const clear = () => {
     set([])
@@ -38,12 +35,6 @@ module.exports = (state, bus) => {
     debug(`received ${incoming.hits.length} results, for ${querystring()}`)
   }
 
-  const replace = data => {
-    set(data)
-    render()
-    debug('results replaced')
-  }
-
   const count = data => {
     if (get().length >= 200) render()
     debug(`${data.count} results in ${data.source} for ${querystring()}`)
@@ -56,11 +47,8 @@ module.exports = (state, bus) => {
     debug('result removed')
   }
 
-  const none = () => bus.emit('search:done-searching')
-
   bus.on('results:clear', clear)
   bus.on('results:receive', receive)
-  bus.on('results:replace', replace)
   bus.on('results:remove', remove)
   bus.on('results:count', count)
 }
