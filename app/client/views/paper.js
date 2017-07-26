@@ -112,12 +112,14 @@ CachedPaper.prototype._render = function () {
   const query = this._query
 
   this._watch(result.paper)
+  const prog = result.paper._minprogress || result.paper.minprogress()
+  console.log("greg prog", prog)
 
   const bar = this._bar = html`
 
   <div
     class="${style.progressbar}"
-    style="${barstyle(result.paper.minprogress())}"
+    style="${barstyle(prog)}"
   />
 
   `
@@ -181,10 +183,7 @@ CachedPaper.prototype._render = function () {
 }
 
 CachedPaper.prototype._watch = function (paper) {
-  paper.on('selected', () => this.updateSelected(true))
-  paper.on('deselected', () => this.updateSelected(false))
-  paper.on('downloading', () => this.updateProgress(paper.minprogress()))
-  paper.on('progress', () => this.updateProgress(paper.minprogress()))
+  //paper.on('progress', () => this.updateProgress(paper.minprogress()))
 }
 
 CachedPaper.prototype.updateSelected = function (selected) {
@@ -195,15 +194,18 @@ CachedPaper.prototype.updateProgress = function (progress) {
   this._bar.style = barstyle(progress)
 }
 
-CachedPaper.prototype._update = function () {
-  return false
+CachedPaper.prototype._update = function (result) {
+  const shouldUpdate = result.paper.shouldUpdate
+  delete result.paper.shouldUpdate
+  console.log("greg ", "doing rendercheck", shouldUpdate)
+  return true
 }
 
 module.exports = (result, state, emit) => {
   let el = elementcache[result.paper.key]
   if (el) {
     el._query = state.search.query
-    return el.render()
+    return el.render(result)
   } else {
     const newel = CachedPaper(result, emit)
     elementcache[result.paper.key] = newel
