@@ -101,8 +101,20 @@ module.exports = (state, bus) => {
   const getref = () => state.selection.reference
 
   const setlist = list => {
-    getlist().forEach(p => p.deselect())
-    list.forEach(p => p.select())
+    getlist().forEach(p => {
+      if (p.selected === true) {
+        p.shouldUpdate = true;
+      }
+      p.selected = false
+    })
+    list.forEach(p => {
+      if (p.shouldUpdate === true) {
+        p.shouldUpdate = false;
+      } else {
+        p.shouldUpdate = true;
+      }
+      p.selected = true
+    })
     state.selection.list = list
   }
   const getlist = () => state.selection.list
