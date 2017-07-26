@@ -81,6 +81,7 @@ function Paper (data) {
       if (stats.progress > 0) self.collected = true
       self.progress = stats.progress * 100
       self.emit('progress', self.progress)
+      // set miniprogress
       self.progresschecked = true
       cb(null, self.progress, true)
     })
@@ -104,8 +105,10 @@ function Paper (data) {
     }
 
     download.on('progress', data => {
+      console.log("greg ", "in the progress", data.progress)
       self.progress = data.progress * 100
-      self.emit('progress', self.progress)
+      self._minprogress = self.minprogress()
+      self.shouldUpdate = true
       if (self.progress === 100) done()
     })
 
@@ -152,16 +155,6 @@ function Paper (data) {
 
   self.minprogress = () => {
     return self.downloading ? Math.max(self.progress, 10) : self.progress
-  }
-
-  self.select = () => {
-    self.selected = true
-    self.emit('selected')
-  }
-
-  self.deselect = () => {
-    self.selected = false
-    self.emit('deselected')
   }
 
   self.loadData()
