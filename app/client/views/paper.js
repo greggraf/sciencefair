@@ -112,14 +112,12 @@ CachedPaper.prototype._render = function () {
   const query = this._query
 
   this._watch(result.paper)
-  const prog = result.paper._minprogress || result.paper.minprogress()
-  console.log("greg prog", prog)
 
   const bar = this._bar = html`
 
   <div
     class="${style.progressbar}"
-    style="${barstyle(prog)}"
+    style="${barstyle(result.paper.minprogress())}"
   />
 
   `
@@ -183,7 +181,7 @@ CachedPaper.prototype._render = function () {
 }
 
 CachedPaper.prototype._watch = function (paper) {
-  //paper.on('progress', () => this.updateProgress(paper.minprogress()))
+  paper.on('progress', () => this.updateProgress(paper.minprogress()))
 }
 
 CachedPaper.prototype.updateSelected = function (selected) {
@@ -197,8 +195,7 @@ CachedPaper.prototype.updateProgress = function (progress) {
 CachedPaper.prototype._update = function (result) {
   const shouldUpdate = result.paper.shouldUpdate
   delete result.paper.shouldUpdate
-  console.log("greg ", "doing rendercheck", shouldUpdate)
-  return true
+  return shouldUpdate
 }
 
 module.exports = (result, state, emit) => {
