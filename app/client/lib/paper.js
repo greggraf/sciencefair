@@ -105,7 +105,6 @@ function Paper (data) {
     }
 
     download.on('progress', data => {
-      console.log("greg ", "in the progress", data.progress)
       self.progress = data.progress * 100
       self._minprogress = self.minprogress()
       self.shouldUpdate = true
