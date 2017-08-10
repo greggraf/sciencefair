@@ -1,7 +1,6 @@
 const path = require('path')
 const inherits = require('inherits')
 const events = require('events')
-const fs = require('fs-extra')
 const uniq = require('lodash/uniq')
 
 const debug = require('debug')('sciencefair:paper')
@@ -54,7 +53,6 @@ function Paper (data) {
     require('./getdatasource').fetch(self.source, (err, ds) => {
       if (err)  return cb(err)
       self.ds = ds
-      self.emit('datasource:loaded', ds)
     })
   }
 
@@ -95,7 +93,6 @@ function Paper (data) {
     const download = self.ds.download(self)
     if (!download) return null // datasource not ready
     debug('downloading', self.key)
-    self.emit('download:started')
     self.collected = true
     self.downloading = true
 
@@ -104,7 +101,6 @@ function Paper (data) {
       debug('downloaded', self.key)
       self.downloading = false
       self.progresschecked = true
-      self.emit('download:done')
     }
 
     download.on('progress', data => {
@@ -116,7 +112,6 @@ function Paper (data) {
     download.on('error', err => {
       self.downloading = false
       debug('error downloading paper: ', self.key)
-      self.emit('download:error', err)
     })
 
     download.on('end', done)
@@ -148,7 +143,6 @@ function Paper (data) {
       self.progress = 0
       self.downloading = false
       self.progresschecked = true
-      self.emit('cleared')
       self.emit('progress', 0)
       cb()
     }
