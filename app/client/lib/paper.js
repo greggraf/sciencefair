@@ -4,6 +4,9 @@ const events = require('events')
 const fs = require('fs-extra')
 const uniq = require('lodash/uniq')
 
+const datasource = require('./getdatasource')
+const {ipcRenderer} = require('electron')
+
 const debug = require('debug')('sciencefair:paper')
 
 function Paper (data) {
@@ -51,11 +54,14 @@ function Paper (data) {
     self.files = uniq((data.files || []).concat([data.entryfile])).map(
       file => path.join(self.path, file)
     )
-    require('./getdatasource').fetch(self.source, (err, ds) => {
-      if (err)  return cb(err)
-      self.ds = ds
-      self.emit('datasource:loaded', ds)
-    })
+
+    if (process.env.FEATURE === "ipc") {} else {
+      require('./getdatasource').fetch(self.source, (err, ds) => {
+        if (err)  return cb(err)
+        self.ds = ds
+        self.emit('datasource:loaded', ds)
+      })
+    }
   }
 
   self.loadSearchResult = () => {
@@ -73,55 +79,109 @@ function Paper (data) {
     if (self.downloading) return cb(null, self.progress)
     if (self.progress === 100) return cb(null, self.progress)
     if (self.progresschecked) return cb(null, self.progress)
-    if (!(self.ds && self.ds.articles && self.ds.articles.content)) {
-      // datasource not ready to check progress, try again after delay
-      return setTimeout(() => self.filesPresent(cb), 500)
-    }
-    self.ds.articlestats(self.files, (err, stats) => {
-      if (err) return cb(err)
-      debug('progress stats', self.title, stats)
-      if (stats.progress > 0) self.collected = true
-      self.progress = stats.progress * 100
-      self.emit('progress', self.progress)
-      self.progresschecked = true
-      cb(null, self.progress, true)
-    })
+    
+    if (process.env.FEATURE === "ipc") {
+      ipcRenderer.send('datasource:articlestats', self)
+      ipcRenderer.on('datasource:articlestats:reply', (event, err, ready, stats) => {
+        if (!ready) return setTimeout(() => self.filesPresent(cb), 500)
+        if (err) return cb(err)
+
+        debug('progress stats', self.title, stats)
+        if (stats.progress > 0) self.collected = true
+        self.progress = stats.progress * 100
+        self.emit('progress', self.progress)
+        self.progresschecked = true
+        cb(null, self.progress, true)
+
+      })
+    } else {
+      if (!(self.ds && self.ds.articles && self.ds.articles.content)) {
+        // datasource not ready to check progress, try again after delay
+        return setTimeout(() => self.filesPresent(cb), 500)
+      }
+      self.ds.articlestats(self.files, (err, stats) => {
+        if (err) return cb(err)
+        debug('progress stats', self.title, stats)
+        if (stats.progress > 0) self.collected = true
+        self.progress = stats.progress * 100
+        self.emit('progress', self.progress)
+        self.progresschecked = true
+        cb(null, self.progress, true)
+      })
+    }    
   }
 
-  self.candownload = () => self.ds.ready()
-
+  if (process.env.FEATURE === "ipc") {
+    self.candownload = ipcRenderer.sendSync('datasource:ready', self.key)
+  } else {
+    self.candownload = () => self.ds.ready()
+  }
+  
   self.download = () => {
     if (self.downloading) return null
-    const download = self.ds.download(self)
-    if (!download) return null // datasource not ready
-    debug('downloading', self.key)
-    self.emit('download:started')
-    self.collected = true
-    self.downloading = true
 
-    const done = () => {
-      if (!self.downloading) return
-      debug('downloaded', self.key)
-      self.downloading = false
-      self.progresschecked = true
-      self.emit('download:done')
+    if (process.env.FEATURE === "ipc") {
+
+      ipcRenderer.send('datasource:download', self)
+      ipcRenderer.on('datasource:download:reply', (event) => {
+        self.collected = true
+        self.downloading = true
+
+        const done = (event) => {
+          if (!self.downloading) return
+          debug('downloaded', self.key)
+          self.downloading = false
+          self.progresschecked = true
+        }
+
+        ipcRenderer.on('datasource:download:progress', (event, data) => {
+          self.progress = data.progress * 100
+          self.emit('progress', self.progress)
+          if (self.progress === 100) done()      
+        })
+        
+        ipcRenderer.on('datasource:download:error', (event, err) => {
+          self.downloading = false
+          debug('error downloading paper: ', self.key)      
+        })
+
+        ipcRenderer.on('datasource:download:end', done)
+      })
+
+
+    } else { 
+  
+      const download = self.ds.download(self)
+      if (!download) return null // datasource not ready
+      debug('downloading', self.key)
+      self.emit('download:started')    
+      self.collected = true
+      self.downloading = true
+
+      const done = () => {
+        if (!self.downloading) return
+        debug('downloaded', self.key)
+        self.downloading = false
+        self.progresschecked = true
+        self.emit('download:done')      
+      }
+
+      download.on('progress', data => {
+        self.progress = data.progress * 100
+        self.emit('progress', self.progress)
+        if (self.progress === 100) done()
+      })
+
+      download.on('error', err => {
+        self.downloading = false
+        debug('error downloading paper: ', self.key)
+        self.emit('download:error', err)      
+      })
+
+      download.on('end', done)
+
+      return download
     }
-
-    download.on('progress', data => {
-      self.progress = data.progress * 100
-      self.emit('progress', self.progress)
-      if (self.progress === 100) done()
-    })
-
-    download.on('error', err => {
-      self.downloading = false
-      debug('error downloading paper: ', self.key)
-      self.emit('download:error', err)
-    })
-
-    download.on('end', done)
-
-    return download
   }
 
   self.metadata = () => {
@@ -143,7 +203,7 @@ function Paper (data) {
   }
 
   self.removeFiles = cb => {
-    const done = err => {
+    const done = (err) => {
       if (err) return cb(err)
       self.progress = 0
       self.downloading = false
@@ -153,7 +213,14 @@ function Paper (data) {
       cb()
     }
 
-    self.ds.clear(self.files, done)
+    if (process.env.FEATURE === "ipc") {
+      ipcRenderer.send('datasource:clear', self.key, self.files)
+      ipcRenderer.on('datasource:clear:reply', (event, err) => {
+        done(err)
+      })
+    } else {
+      self.ds.clear(self.files, done)
+    }
   }
 
   self.minprogress = () => {

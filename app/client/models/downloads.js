@@ -3,6 +3,7 @@ const uniqBy = require('lodash/uniqBy')
 const speedometer = require('speedometer')
 const datasource = require('../lib/getdatasource')
 const getpaper = require('../lib/getpaper')
+const {ipcRenderer} = require('electron')
 
 const debug = require('debug')('sciencefair:downloads')
 
@@ -58,7 +59,14 @@ module.exports = (state, bus) => {
     }
   }
 
-  const poll = () => datasource.all().forEach(ds => updatespeed(ds.speed()))
+  const poll = () => {
+    if (process.env.FEATURE === "ipc") {
+      const speeds = ipcRenderer.sendSync('datasources:updatespeeds')    
+      speeds.forEach(ds => updatespeed(ds.speed()))
+    } else { 
+      datasource.all().forEach(ds => updatespeed(ds.speed()))
+    }
+  }
 
   // this subscription sets downloads running that were part-completed
   // when the app last quit

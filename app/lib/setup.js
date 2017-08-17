@@ -20,3 +20,7 @@ ipcMain.on('datasources:updateKeys', (event, arg) => {
 
 require('./defaultsources')
 require('./contentserver')
+
+if (process.env.FEATURE === "ipc") {
+  require('./datasourceschannel')
+}

@@ -52,24 +52,47 @@ module.exports = (state, bus) => {
 
     if (source.key.length !== 64) return addfail('key must be 64 characters')
 
-    datasource.fetch(source.key, (err, ds) => {
-      if (err) return addfail(err.message)
-      if (source.active) ds.setActive()
-
-      ds.connect()
-
-      if (datasource.all().length > 1) {
-        bus.emit('notification:add', {
-          title: 'Datasource added',
-          message: 'datasource added:\n' + ds.name
-        })
-      }
-
-      ds.on('connected', () => {
+    if (process.env.FEATURE === "ipc") {
+      ipcRenderer.send('datasources:add', source)
+      
+      ipcRenderer.on('datasources:add:connected', (event) => {
         if (state.initialising) bus.emit('initialising:stop')
       })
-      ds.on('progress', () => { if (state.initialising) render() })
-    })
+      
+      ipcRenderer.on('datasources:add:progress', (event) => {
+        if (state.initialising) render() 
+      })
+      
+      ipcRenderer.on('datasources:add:reply', (event, err, result) => {
+        if (err) return addfail(err.message)
+        
+        if (result.success) {
+          bus.emit('notification:add', {
+            title: 'Datasource added',
+            message: 'datasource added:\n' + result.name
+          })
+        }
+      })
+    } else {
+      datasource.fetch(source.key, (err, ds) => {
+        if (err) return addfail(err.message)
+        if (source.active) ds.setActive()
+
+        ds.connect()
+
+        if (datasource.all().length > 1) {
+          bus.emit('notification:add', {
+            title: 'Datasource added',
+            message: 'datasource added:\n' + ds.name
+          })
+        }
+
+        ds.on('connected', () => {
+          if (state.initialising) bus.emit('initialising:stop')
+        })
+        ds.on('progress', () => { if (state.initialising) render() })
+      })
+    }
   }
 
   const remove = source => {
@@ -154,16 +177,24 @@ module.exports = (state, bus) => {
   }
 
   const toggleActive = key => {
-    datasource.fetch(key, (err, source) => {
-      if (err) return bus.emit('error', err)
+    if (process.env.FEATURE === "ipc") {
+      ipcRenderer.send('datasources:toggleactive', key)
+      
+      ipcRenderer.on('datasources:toggleactive:reply', (event, err) => {
+        if (err) return bus.emit('error', err)
+      })
+    } else { 
+      datasource.fetch(key, (err, source) => {
+        if (err) return bus.emit('error', err)
 
-      source.toggleActive()
-      if (source.stats.get('active').value()) {
-        source.maybeSyncMetadata(err => {
-          if (err) return bus.emit('error', err)
-        })
-      }
-    })
+        source.toggleActive()
+        if (source.stats.get('active').value()) {
+          source.maybeSyncMetadata(err => {
+            if (err) return bus.emit('error', err)
+          })
+        }
+      })
+    }
   }
 
   const init = () => {
@@ -172,8 +203,13 @@ module.exports = (state, bus) => {
   }
 
   const poll = () => {
-    const sources = datasource.all()
-    const news = sources.map(ds => ds.data())
+    let news;
+    if (process.env.FEATURE === "ipc") {
+      news = ipcRenderer.sendSync('datasources:toggleactive')    
+    } else {
+      const sources = datasource.all()
+      news = sources.map(ds => ds.data())    
+    }  
 
     // update initialising
     const any10pc = any(news, ds => {
