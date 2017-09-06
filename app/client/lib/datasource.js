@@ -102,6 +102,9 @@ function Datasource (key, opts) {
 
   // connect to the hyperdrive swarm and activate the DB
   self.connect = cb => {
+    function noop () {}
+    cb = cb || noop
+
     if (self.metadata) return cb()
 
     // callback after an error, or when both database and hyperdrive
