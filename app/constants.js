@@ -5,9 +5,10 @@ const remote = require('electron').remote
 const api = app || remote.app
 
 const DEVMODE = !!(process.env['SCIENCEFAIR_DEVMODE'])
+const IPCMODE = process.env['FEATURE'] === "ipc" ? "_ipc": "";
 
 const docs = api.getPath('documents')
-const dataroot = path.join(docs, DEVMODE ? 'sciencefair_dev' : 'sciencefair')
+const dataroot = path.join(docs, DEVMODE ? 'sciencefair_dev' + IPCMODE : 'sciencefair')
 
 module.exports = {
   // paths
