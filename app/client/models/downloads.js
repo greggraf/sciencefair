@@ -61,8 +61,8 @@ module.exports = (state, bus) => {
 
   const poll = () => {
     if (process.env.FEATURE === "ipc") {
-      const speeds = ipcRenderer.sendSync('datasources:updatespeeds')    
-      speeds.forEach(ds => updatespeed(ds.speed()))
+      const speeds = ipcRenderer.sendSync('datasource:updatespeeds')    
+      speeds.forEach(speed => updatespeed(speed))
     } else { 
       datasource.all().forEach(ds => updatespeed(ds.speed()))
     }
