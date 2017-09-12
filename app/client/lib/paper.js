@@ -81,8 +81,9 @@ function Paper (data) {
     if (self.progresschecked) return cb(null, self.progress)
     
     if (process.env.FEATURE === "ipc") {
-      ipcRenderer.send('datasource:articlestats', self)
-      ipcRenderer.on('datasource:articlestats:reply', (event, err, ready, stats) => {
+      const onreply = (event, key, err, ready, stats) => {
+        if (self.key !== key) return
+        ipcRenderer.removeListener('datasource:articlestats', onreply)
         if (!ready) return setTimeout(() => self.filesPresent(cb), 500)
         if (err) return cb(err)
 
@@ -92,8 +93,10 @@ function Paper (data) {
         self.emit('progress', self.progress)
         self.progresschecked = true
         cb(null, self.progress, true)
+      }
 
-      })
+      ipcRenderer.send('datasource:articlestats', self)
+      ipcRenderer.on('datasource:articlestats', onreply)
     } else {
       if (!(self.ds && self.ds.articles && self.ds.articles.content)) {
         // datasource not ready to check progress, try again after delay
@@ -112,7 +115,7 @@ function Paper (data) {
   }
 
   if (process.env.FEATURE === "ipc") {
-    self.candownload = ipcRenderer.sendSync('datasource:ready', self.key)
+    self.candownload = () => ipcRenderer.sendSync('datasource:ready', self.source)
   } else {
     self.candownload = () => self.ds.ready()
   }
@@ -121,34 +124,53 @@ function Paper (data) {
     if (self.downloading) return null
 
     if (process.env.FEATURE === "ipc") {
+      const removeListeners = () => {
+        if (!self.downloading) {
+          ipcRenderer.removeListener('datasource:getpaper:progress', onprogress)
+          ipcRenderer.removeListener('datasource:getpaper:end', done)
+          ipcRenderer.removeListener('datasource:getpaper', onreply)
+        }
+      }
 
-      ipcRenderer.send('datasource:download', self)
-      ipcRenderer.on('datasource:download:reply', (event) => {
-        self.collected = true
-        self.downloading = true
+      const done = (event, key) => {
+        if (self.key !== key) return
 
-        const done = (event) => {
-          if (!self.downloading) return
-          debug('downloaded', self.key)
+        removeListeners()
+        if (!self.downloading) return
+        debug('downloaded', self.key)
+        self.downloading = false
+        self.progresschecked = true
+      }
+
+      const onprogress = (event, key, data) => {
+        if (self.key !== key) return
+
+        self.progress = data.progress * 100
+        self.emit('progress', self.progress)
+        if (self.progress === 100) done()
+      }
+
+      const onreply = (event, key, err) => {
+        if (self.key !== key) return
+
+        if (err) {
           self.downloading = false
-          self.progresschecked = true
+          debug('error downloading paper: ', self.key, err)
+          return
         }
 
-        ipcRenderer.on('datasource:download:progress', (event, data) => {
-          self.progress = data.progress * 100
-          self.emit('progress', self.progress)
-          if (self.progress === 100) done()      
-        })
-        
-        ipcRenderer.on('datasource:download:error', (event, err) => {
-          self.downloading = false
-          debug('error downloading paper: ', self.key)      
-        })
+        ipcRenderer.on('datasource:getpaper:progress', onprogress)
+        ipcRenderer.on('datasource:getpaper:end', done)
+        self.collected = true
+        self.downloading = true
+      }
 
-        ipcRenderer.on('datasource:download:end', done)
-      })
+      ipcRenderer.send('datasource:getpaper', self)
 
-
+      if (self.subscribed) {} else {
+      self.subscribed = true
+      ipcRenderer.on('datasource:getpaper', onreply)
+      }
     } else { 
   
       const download = self.ds.download(self)
@@ -214,10 +236,13 @@ function Paper (data) {
     }
 
     if (process.env.FEATURE === "ipc") {
-      ipcRenderer.send('datasource:clear', self.key, self.files)
-      ipcRenderer.on('datasource:clear:reply', (event, err) => {
+      const onreply = (event, key, err) => {
+        if (self.key != key) return
+        ipcRenderer.removeListener('datasource:clear', onreply)
         done(err)
-      })
+      }
+      ipcRenderer.send('datasource:clear', self.source, self.files, self.key)
+      ipcRenderer.on('datasource:clear', onreply)
     } else {
       self.ds.clear(self.files, done)
     }
