@@ -4,10 +4,9 @@ const events = require('events')
 const fs = require('fs-extra')
 const uniq = require('lodash/uniq')
 
-const datasource = require('./getdatasource')
-const {ipcRenderer} = require('electron')
-
 const debug = require('debug')('sciencefair:paper')
+
+const {ipcRenderer} = require('electron')
 
 function Paper (data) {
   if (data instanceof Paper) return data
@@ -55,7 +54,7 @@ function Paper (data) {
       file => path.join(self.path, file)
     )
 
-    if (process.env.FEATURE === "ipc") {} else {
+    if (process.env.FEATURE !== "ipc") {
       require('./getdatasource').fetch(self.source, (err, ds) => {
         if (err)  return cb(err)
         self.ds = ds
@@ -176,7 +175,7 @@ function Paper (data) {
       const download = self.ds.download(self)
       if (!download) return null // datasource not ready
       debug('downloading', self.key)
-      self.emit('download:started')    
+      self.emit('download:started')
       self.collected = true
       self.downloading = true
 
@@ -185,7 +184,7 @@ function Paper (data) {
         debug('downloaded', self.key)
         self.downloading = false
         self.progresschecked = true
-        self.emit('download:done')      
+        self.emit('download:done')
       }
 
       download.on('progress', data => {
@@ -197,7 +196,7 @@ function Paper (data) {
       download.on('error', err => {
         self.downloading = false
         debug('error downloading paper: ', self.key)
-        self.emit('download:error', err)      
+        self.emit('download:error', err)
       })
 
       download.on('end', done)
@@ -225,7 +224,7 @@ function Paper (data) {
   }
 
   self.removeFiles = cb => {
-    const done = (err) => {
+    const done = err => {
       if (err) return cb(err)
       self.progress = 0
       self.downloading = false

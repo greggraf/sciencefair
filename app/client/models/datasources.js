@@ -108,11 +108,11 @@ module.exports = (state, bus) => {
     }
   }
 
-  const remove = key => {
+  const remove = source => {
     if (process.env.FEATURE === "ipc") {
-      ipcRenderer.send('datasource:remove', key)
+      ipcRenderer.send('datasource:remove', source)
       ipcRenderer.on('datasource:remove', (event, dskey, err, dsname) => {
-        if (dskey !== key) return
+        if (dskey !== source) return
         bus.emit('notification:add', {
           title: 'Datasource removed',
           message: 'datasource removed:\n' + dsname
@@ -230,15 +230,15 @@ module.exports = (state, bus) => {
     render()
   }
 
-  const toggleActive = dskey => {
+  const toggleActive = key => {
     if (process.env.FEATURE === "ipc") {
-      const ontoggleactive = (event, key, err) => {
-        if (key !== dskey) return
+      const ontoggleactive = (event, dskey, err) => {
+        if (dskey !== key) return
         ipcRenderer.removeListener('datasource:toggleactive', ontoggleactive)
         if (err) return bus.emit('error', err)
       }
 
-      ipcRenderer.send('datasource:toggleactive', dskey)
+      ipcRenderer.send('datasource:toggleactive', key)
       ipcRenderer.on('datasource:toggleactive', ontoggleactive)
     } else { 
       datasource.fetch(key, (err, source) => {
