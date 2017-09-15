@@ -1,6 +1,6 @@
 const Paper = require('./paper')
 
-papers = {}
+const papers = {}
 
 module.exports = (data, skipcache) => {
   if (skipcache) return Paper(data)
