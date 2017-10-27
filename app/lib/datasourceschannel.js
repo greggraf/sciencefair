@@ -22,9 +22,8 @@ ipcMain.on('datasource:clear', (event, dskey, files, paperkey) => {
     if (err) return event.sender.send('datasource:clear', paperkey, err)
 
     ds.clear(files, () => {
-     event.sender.send('datasource:clear', paperkey)
+      event.sender.send('datasource:clear', paperkey)
     })
-
   })
 })
 
@@ -39,6 +38,7 @@ ipcMain.on('datasource:remove', (event, dskey) => {
 
 ipcMain.on('datasource:ready', (event, dskey) => {
   getdatasource.fetch(dskey, (err, ds) => {
+    if (err) event.returnValue = false
     event.returnValue = ds.ready()
   })
 })
@@ -67,7 +67,7 @@ ipcMain.on('datasource:getpaper', (event, paper) => {
 
     const download = ds.download(paper)
     if (!download) {
-      return event.sender.send('datasource:getpaper', paper.key, "datastore not ready")
+      return event.sender.send('datasource:getpaper', paper.key, 'datastore not ready')
     }
 
     download.on('progress', data => {
@@ -91,14 +91,13 @@ ipcMain.on('datasource:articlestats', (event, paper) => {
     if (err) return event.sender.send('datasource:articlestats', paper.key, err)
 
     if (!(ds && ds.articles && ds.articles.content)) {
-      return event.sender.send('datasource:articlestats', paper.key,  err, false)
+      return event.sender.send('datasource:articlestats', paper.key, err, false)
     }
 
     ds.articlestats(paper.files, (err, stats) => {
       if (err) return event.sender.send('datasource:articlestats', paper.key, err)
       event.sender.send('datasource:articlestats', paper.key, err, true, stats)
     })
-
   })
 })
 
@@ -156,13 +155,13 @@ ipcMain.on('datasource:search', (event, active, query) => {
     getdatasource.fetch(ds.key, (err, source) => {
       if (err) return event.sender.send('datasource:search:error', err)
 
-        const resultstream = pumpify(
+      const resultstream = pumpify(
           source.db.search(query),
           batchify(30),
           resultify(source)
         )
 
-        activesearches.push(resultstream)
+      activesearches.push(resultstream)
     })
   })
 })

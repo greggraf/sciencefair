@@ -52,24 +52,24 @@ module.exports = (state, bus) => {
 
     if (source.key.length !== 64) return addfail('key must be 64 characters')
 
-    if (process.env.FEATURE === "ipc") {
+    if (process.env.FEATURE === 'ipc') {
       const removeListeners = () => {
         ipcRenderer.removeListener('datasource:add:connected', onconnected)
         ipcRenderer.removeListener('datasource:add:progress', onprogress)
         ipcRenderer.removeListener('datasource:add', onadd)
       }
-      
+
       const onconnected = (event, key) => {
         if (source.key !== key) return
         if (state.initialising) bus.emit('initialising:stop')
         removeListeners()
       }
-      
+
       const onprogress = (event, key) => {
         if (source.key !== key) return
-        if (state.initialising) render() 
+        if (state.initialising) render()
       }
-      
+
       const onadd = (event, key, err, dsname) => {
         if (source.key !== key) return
         if (err) {
@@ -109,7 +109,7 @@ module.exports = (state, bus) => {
   }
 
   const remove = source => {
-    if (process.env.FEATURE === "ipc") {
+    if (process.env.FEATURE === 'ipc') {
       ipcRenderer.send('datasource:remove', source)
       ipcRenderer.on('datasource:remove', (event, dskey, err, dsname) => {
         if (dskey !== source) return
@@ -135,7 +135,7 @@ module.exports = (state, bus) => {
   let activesearches = []
 
   const cancelsearch = () => {
-    if (process.env.FEATURE === "ipc") {
+    if (process.env.FEATURE === 'ipc') {
       ipcRenderer.send('datasource:search:cancel')
     } else {
       if (activesearches.length > 0) {
@@ -161,7 +161,7 @@ module.exports = (state, bus) => {
       ipcRenderer.removeListener('datasource:search:results', onresults)
     }
 
-    if (process.env.FEATURE === "ipc") {
+    if (process.env.FEATURE === 'ipc') {
       oncancel()
     } else {
       cancelsearch()
@@ -179,46 +179,44 @@ module.exports = (state, bus) => {
 
     let query = state.search.query.trim().replace(/et al\.?$/, '')
 
-    if (process.env.FEATURE === "ipc") {
+    if (process.env.FEATURE === 'ipc') {
       ipcRenderer.send('datasource:search', active, query)
       ipcRenderer.on('datasource:search:cancel', oncancel)
       ipcRenderer.on('datasource:search:receive', onreceive)
       ipcRenderer.on('datasource:search:results', onresults)
-
     } else {
-
       const resultify = ds => {
-      let count = 0
+        let count = 0
 
-      const write = (hits, _, cb) => {
-        count += hits.length
+        const write = (hits, _, cb) => {
+          count += hits.length
 
-        hits.forEach(r => {
-          r.source = ds.key
-        })
-        bus.emit('results:receive', { hits: hits })
+          hits.forEach(r => {
+            r.source = ds.key
+          })
+          bus.emit('results:receive', { hits: hits })
 
-        cb()
+          cb()
+        }
+
+        const flush = cb => {
+          if (count === 0) bus.emit('results:receive', { hits: [] })
+          bus.emit('results:count', { count: count, source: ds.name })
+          cb()
+        }
+
+        return through.obj(write, flush)
       }
-
-      const flush = cb => {
-        if (count === 0) bus.emit('results:receive', { hits: [] })
-        bus.emit('results:count', { count: count, source: ds.name })
-        cb()
-      }
-
-      return through.obj(write, flush)
-    }
       active.forEach(ds => datasource.fetch(ds.key, (err, source) => {
-      if (err) throw err
+        if (err) throw err
 
-      const resultstream = pumpify(
+        const resultstream = pumpify(
         source.db.search(query),
         batchify(30),
         resultify(source)
       )
-      activesearches.push(resultstream)
-    }))
+        activesearches.push(resultstream)
+      }))
     }
   }
 
@@ -233,7 +231,7 @@ module.exports = (state, bus) => {
   }
 
   const toggleActive = key => {
-    if (process.env.FEATURE === "ipc") {
+    if (process.env.FEATURE === 'ipc') {
       const ontoggleactive = (event, dskey, err) => {
         if (dskey !== key) return
         ipcRenderer.removeListener('datasource:toggleactive', ontoggleactive)
@@ -242,7 +240,7 @@ module.exports = (state, bus) => {
 
       ipcRenderer.send('datasource:toggleactive', key)
       ipcRenderer.on('datasource:toggleactive', ontoggleactive)
-    } else { 
+    } else {
       datasource.fetch(key, (err, source) => {
         if (err) return bus.emit('error', err)
 
@@ -262,13 +260,13 @@ module.exports = (state, bus) => {
   }
 
   const poll = () => {
-    let news;
-    if (process.env.FEATURE === "ipc") {
+    let news
+    if (process.env.FEATURE === 'ipc') {
       news = ipcRenderer.sendSync('datasource:getalldata')
     } else {
       const sources = datasource.all()
-      news = sources.map(ds => ds.data())    
-    }  
+      news = sources.map(ds => ds.data())
+    }
 
     // update initialising
     const any10pc = any(news, ds => {
