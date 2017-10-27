@@ -1,5 +1,4 @@
 const all = require('lodash/every')
-const uniqBy = require('lodash/uniqBy')
 const speedometer = require('speedometer')
 const datasource = require('../lib/getdatasource')
 const getpaper = require('../lib/getpaper')
@@ -26,7 +25,7 @@ module.exports = (state, bus) => {
 
     papers = papers.filter(p => !p.downloading && !(p.progress === 1))
     if (papers.length === 0) {
-      debug ('no papers to download')
+      debug('no papers to download')
       return
     }
 
@@ -83,7 +82,7 @@ module.exports = (state, bus) => {
       const paper = getpaper(data.value)
       paper.filesPresent((err, progress) => {
         if (err) return cb(err)
-        loaded ++
+        loaded++
         if (progress < 100) {
           incomplete++
           paper.download()

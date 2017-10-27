@@ -175,6 +175,8 @@ module.exports = (state, bus) => {
 
     if (active.length === 0) return bus.emit('results:none', 'datasources')
 
+    if (!state.search.query) return bus.emit('results:none', 'datasources')
+
     let query = state.search.query.trim().replace(/et al\.?$/, '')
 
     if (process.env.FEATURE === "ipc") {
